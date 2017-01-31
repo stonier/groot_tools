@@ -17,7 +17,7 @@ setup(
     version=__version__,
     packages=find_packages(exclude=['tests*', 'docs*']),
     scripts=[
-        'scripts/cfind',
+        'scripts/groot-cfind',
     ],
     data_files=[],  # system files?
     install_requires=install_requires,
