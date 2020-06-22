@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/).
 ### Changed
 - ...
 
+## [0.2.0] - 2020-06-25
+### Added
+- upgraded to python3
+
 ## [0.1.1] - 2017-01-31
 ### Changed
 - cfind -> groot-cfind

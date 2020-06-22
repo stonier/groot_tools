@@ -14,7 +14,7 @@ help:
 	@echo "  clean     : clean build/dist directories."
 
 build:
-	python setup.py build
+	python3 setup.py build
 
 build_deps:
 	echo "Downloading dependencies"
@@ -30,18 +30,18 @@ clean:
 	-rm -rf *.egg-info
 
 source_package:
-	python setup.py sdist
+	python3 setup.py sdist
 
 source_deb:
 	rm -rf dist deb_dist
-	python setup.py --command-packages=stdeb.command sdist_dsc
+	python3 setup.py --command-packages=stdeb.command sdist_dsc
 
 deb:
 	rm -rf dist deb_dist
-	python setup.py --command-packages=stdeb.command bdist_deb
+	python3 setup.py --command-packages=stdeb.command bdist_deb
 
 pypi: 
-	python setup.py sdist upload
+	python3 setup.py sdist upload
 
 upload_deb:
 	cd deb_dist; ../scripts/yujin_upload_deb python-yujin-tools
