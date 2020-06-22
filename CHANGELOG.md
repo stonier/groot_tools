@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/).
 ### Changed
 - ...
 
+## [0.2.1] - 2020-06-25
+### Changed
+- bugfix for argparse, is now in python3
+
 ## [0.2.0] - 2020-06-25
 ### Added
 - upgraded to python3
