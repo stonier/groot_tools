@@ -18,6 +18,8 @@ setup(
     packages=find_packages(exclude=['tests*', 'docs*']),
     scripts=[
         'scripts/groot-cfind',
+        'scripts/groot-docker-build',
+        'scripts/groot-docker-enter',
     ],
     data_files=[],  # system files?
     install_requires=install_requires,

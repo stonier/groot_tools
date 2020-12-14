@@ -1,0 +1,212 @@
+#!/bin/bash
+
+##############################################################################
+# Colours
+##############################################################################
+
+BOLD="\e[1m"
+
+CYAN="\e[36m"
+GREEN="\e[32m"
+RED="\e[31m"
+YELLOW="\e[33m"
+
+RESET="\e[0m"
+
+padded_message ()
+{
+  line="........................................"
+  printf "%s %s${2}\n" ${1} "${line:${#1}}"
+}
+
+pretty_header ()
+{
+  echo -e "${BOLD}${1}${RESET}"
+}
+
+pretty_print ()
+{
+  echo -e "${GREEN}${1}${RESET}"
+}
+
+pretty_warning ()
+{
+  echo -e "${YELLOW}${1}${RESET}"
+}
+
+pretty_error ()
+{
+  echo -e "${RED}${1}${RESET}"
+}
+
+##############################################################################
+# Methods
+##############################################################################
+
+install_package ()
+{
+  PACKAGE_NAME=$1
+  dpkg -s ${PACKAGE_NAME} > /dev/null
+  if [ $? -ne 0 ]; then
+    sudo apt-get -q -y install ${PACKAGE_NAME} > /dev/null
+  else
+    pretty_print "  $(padded_message ${PACKAGE_NAME} "found")"
+    return 0
+  fi
+  if [ $? -ne 0 ]; then
+    pretty_error "  $(padded_message ${PACKAGE_NAME} "failed")"
+    return 1
+  fi
+  pretty_warning "  $(padded_message ${PACKAGE_NAME} "installed")"
+  return 0
+}
+
+##############################################################################
+# Command Line Parsing
+##############################################################################
+
+show_help ()
+{
+  pretty_print "    Usage:"
+  pretty_print "        $0 <options>"
+  pretty_print ""
+  pretty_print "    Required Options:"
+  pretty_print "        --distro=<distro> : one of bionic, focal"
+  pretty_print ""
+  pretty_print "    Options:"
+  pretty_print "        --help            : show this help message"
+  pretty_print ""
+  pretty_print "    Note: this utilises the current shell user's id/name"
+  pretty_print "    to create an analogous user within the docker image."
+  pretty_print ""
+  exit 0
+}
+
+for i in "$@"
+do
+case $i in
+    --help)
+    SHOW_HELP=1
+    shift
+    ;;
+    -d=*|--distro=*)
+    DISTRO="${i#*=}"
+    shift
+    ;;
+    *)
+       # nothing to do
+    ;;
+esac
+done
+
+if [ ! -z "$SHOW_HELP" ]; then
+  show_help
+  exit 0
+fi
+
+if [ -z "${DISTRO}" ]; then
+  pretty_error "The argument '--distro' is a required option, refer to --help for more details."
+  exit 1
+fi
+
+if [ ${DISTRO} = "bionic" ]; then
+  RELEASE="18.04"
+elif [ ${DISTRO} = "focal" ]; then
+  RELEASE="20.04"
+else
+  pretty_error "Unsupported Release ['bionic', 'focal']"
+  exit 1
+fi
+
+##############################################################################
+# System Dependencies
+##############################################################################
+
+pretty_header "System Dependencies"
+install_package docker.io || return
+
+##############################################################################
+# Variables
+##############################################################################
+
+DOCKERFILE=/tmp/Dockerfile
+UBUNTU_IMAGE=ubuntu:${RELEASE}
+DOCKER_IMAGE=groot:${DISTRO}
+USER_ID=$(id -u ${USER})
+
+##############################################################################
+# Debug
+##############################################################################
+
+pretty_print ""
+pretty_print "Variables"
+pretty_print ""
+pretty_print "  DOCKERFILE............${DOCKERFILE}"
+pretty_print "  UBUNTU_IMAGE..........${UBUNTU_IMAGE}"
+pretty_print "  DOCKER_IMAGE..........${DOCKER_IMAGE}"
+pretty_print "  USER..................${USER}"
+pretty_print "  USER_ID...............${USER_ID}"
+pretty_print ""
+pretty_print "---------------------------------------------------------------"
+pretty_print ""
+
+
+##############################################################################
+# Dockerfile
+##############################################################################
+
+pretty_header "Dockerfile"
+
+# This is a quoted heredoc ('EOL') that will escape special characters so the
+# bash variables don't get substituted here.
+#  https://stackoverflow.com/questions/45047380/write-text-to-file-literally-including-special-characters
+
+cat << EOL > ${DOCKERFILE}
+
+# Ubuntu images are listed at https://hub.docker.com/_/ubuntu/, can also use 'latest'
+FROM ${UBUNTU_IMAGE}
+LABEL maintainer="Daniel Stonier"
+
+# Build Arguments
+ARG USER_ID=1000
+ARG USER_NAME=bob
+ARG WORKSPACE_DIR="/home/\${USER_NAME}/workspace"
+
+RUN adduser --quiet --disabled-password \
+    --shell /bin/bash --home /home/\${USER_NAME}  \
+    --gecos "Daniel Stonier" \${USER_NAME} \
+    --uid \${USER_ID} && \
+    apt-get update && \
+    apt-get -y install apt-utils sudo && \
+    echo "\${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
+    usermod -a -G sudo \${USER_NAME} && \
+    echo "I'm grooty, you should be too"
+
+USER \${USER_NAME}
+# USER root
+
+# Not sure if this is the best option, just what my non-docker user has, needed by some shell commands.
+ENV TERM xterm-256color
+
+SHELL ["/bin/bash", "--login", "-i"]
+
+WORKDIR \${WORKSPACE_DIR}
+
+# Used instead of CMD here so it can't be overridden on the command line
+ENTRYPOINT ["/bin/bash", "--login", "-i"]
+EOL
+
+##############################################################################
+# Build Image
+##############################################################################
+
+pretty_header "Docker Image"
+
+#   --rm: remove intermediate objects
+#   -f: filename
+#   -t: a label for the image (name:tag)
+
+docker image build \
+    --build-arg USER_ID=${USER_ID} \
+    --build-arg USER_NAME=${USER} \
+    --rm -f ${DOCKERFILE} -t ${DOCKER_IMAGE} .

@@ -1,0 +1,149 @@
+#!/bin/bash
+
+##############################################################################
+# Colours
+##############################################################################
+
+BOLD="\e[1m"
+
+CYAN="\e[36m"
+GREEN="\e[32m"
+RED="\e[31m"
+YELLOW="\e[33m"
+
+RESET="\e[0m"
+
+padded_message ()
+{
+  line="........................................"
+  printf "%s %s${2}\n" ${1} "${line:${#1}}"
+}
+
+pretty_header ()
+{
+  echo -e "${BOLD}${1}${RESET}"
+}
+
+pretty_print ()
+{
+  echo -e "${GREEN}${1}${RESET}"
+}
+
+pretty_warning ()
+{
+  echo -e "${YELLOW}${1}${RESET}"
+}
+
+pretty_error ()
+{
+  echo -e "${RED}${1}${RESET}"
+}
+
+##############################################################################
+# Command Line Parsing
+##############################################################################
+
+show_help ()
+{
+  pretty_print "    Usage:"
+  pretty_print "        $0 <options>"
+  pretty_print ""
+  pretty_print "    Required Options:"
+  pretty_print "        --distro=<distro>       : image name (e.g. 'bionic')"
+  pretty_print "        --workspace=<workspace> : worskpace dir (e.g. /mnt/workspaces/foo)"
+  pretty_print ""
+  pretty_print "    Options:"
+  pretty_print "        --help : show this help message"
+  pretty_print ""
+  pretty_print "    Note: the trailing directory given by workspace will be used as a unique"
+  pretty_print "    identifier for the docker container name."
+  pretty_print ""
+  exit 0
+}
+
+for i in "$@"
+do
+case $i in
+    --help)
+    SHOW_HELP=1
+    shift
+    ;;
+    -d=*|--distro=*)
+    DISTRO="${i#*=}"
+    shift
+    ;;
+    -w=*|--workspace=*)
+    WORKSPACE="${i#*=}"
+    shift
+    ;;
+    *)
+       # unknown option
+    ;;
+esac
+done
+
+
+if [ ! -z "$SHOW_HELP" ]; then
+  show_help
+  exit 0
+fi
+
+
+if [ -z "${DISTRO}" ]; then
+  pretty_error "The argument '--distro' is a required option, refer to --help for more details."
+  exit 1
+fi
+
+if [ -z "${WORKSPACE}" ]; then
+  pretty_error "The argument '--workspace' is a required option, refer to --help for more details."
+  exit 1
+fi
+
+##############################################################################
+# Variables
+##############################################################################
+
+DOCKER_IMAGE=groot:${DISTRO}
+CONTAINER_NAME="$(basename ${WORKSPACE})"
+TARGET_WORKSPACE=/home/${USER}/workspace
+MOUNT_OPTIONS="--mount src=${WORKSPACE},target=${TARGET_WORKSPACE},type=bind"
+EXITED_CONTAINER_ID=`docker ps -aq -f status=exited -f name=${CONTAINER_NAME}`
+RUNNING_CONTAINER_ID=`docker ps -aq -f status=running -f name=${CONTAINER_NAME}`
+
+##############################################################################
+# Debug
+##############################################################################
+
+pretty_print ""
+pretty_print "Variables"
+pretty_print ""
+pretty_print "  SOURCE WORKSPACE......${WORKSPACE}"
+pretty_print "  TARGET WORKSPACE......${TARGET_WORKSPACE}"
+pretty_print "  DOCKER_IMAGE..........${DOCKER_IMAGE}"
+pretty_print "  CONTAINER_NAME........${CONTAINER_NAME}"
+pretty_print ""
+pretty_print "---------------------------------------------------------------"
+pretty_print ""
+
+##############################################################################
+# Execute
+##############################################################################
+
+if [ ! -z "${EXITED_CONTAINER_ID}" ]; then
+  pretty_print "Start session with container '${CONTAINER_NAME}'"
+  docker container start -i ${EXITED_CONTAINER_ID}
+elif [ ! -z "${RUNNING_CONTAINER_ID}" ]; then
+  pretty_print "Attach to running session with container '${CONTAINER_NAME}'"
+  pretty_print " - Did you wish to stop/start instead?"
+  pretty_print " - CTRL-P-Q to exit without exiting the original"
+  docker container attach ${RUNNING_CONTAINER_ID}
+else
+  # Docker Run Options: 
+  #   -i  : interactively run the image in a container 
+  #   -rm : remove the container on exit, this loses changes!
+  #   -t  : attach a pseudo tty, needed for e.g. stdin/stdout, vim etc
+  pretty_print "Create/Start container '${DOCKER_IMAGE}'->'${CONTAINER_NAME}'"
+  echo "docker container run ${MOUNT_OPTIONS} -i -t ${DOCKER_IMAGE}"
+  docker container run ${MOUNT_OPTIONS} -i -t --name ${CONTAINER_NAME} ${DOCKER_IMAGE}
+fi
+
