@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/).
 ### Changed
 - ...
 
+## [0.3.1] - 2020-12-15
+### Changed
+- groot-docker-build uses temp dirs to avoid creating unnecessary contexts
+
 ## [0.3.0] - 2020-12-14
 ### Added
 - added groot-docker-build and groot-docker-enter
