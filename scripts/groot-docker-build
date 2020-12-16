@@ -129,7 +129,8 @@ install_package docker.io || return
 # Variables
 ##############################################################################
 
-DOCKERFILE=/tmp/Dockerfile
+DOCKERFILE_DIR=`mktemp -d -p "/tmp"`
+DOCKERFILE=${DOCKERFILE_DIR}/Dockerfile
 UBUNTU_IMAGE=ubuntu:${RELEASE}
 DOCKER_IMAGE=groot:${DISTRO}
 USER_ID=$(id -u ${USER})
@@ -209,4 +210,5 @@ pretty_header "Docker Image"
 docker image build \
     --build-arg USER_ID=${USER_ID} \
     --build-arg USER_NAME=${USER} \
-    --rm -f ${DOCKERFILE} -t ${DOCKER_IMAGE} .
+    --rm -t ${DOCKER_IMAGE} \
+    ${DOCKERFILE_DIR}
