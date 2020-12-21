@@ -134,6 +134,7 @@ DOCKERFILE=${DOCKERFILE_DIR}/Dockerfile
 UBUNTU_IMAGE=ubuntu:${RELEASE}
 DOCKER_IMAGE=groot:${DISTRO}
 USER_ID=$(id -u ${USER})
+SYSTEM_DEPS="apt-utils bash-completion build-essential curl lsb-release sudo vim wget"
 
 ##############################################################################
 # Debug
@@ -147,10 +148,10 @@ pretty_print "  UBUNTU_IMAGE..........${UBUNTU_IMAGE}"
 pretty_print "  DOCKER_IMAGE..........${DOCKER_IMAGE}"
 pretty_print "  USER..................${USER}"
 pretty_print "  USER_ID...............${USER_ID}"
+pretty_print "  SYSTEM_DEPS...........${SYSTEM_DEPS}"
 pretty_print ""
 pretty_print "---------------------------------------------------------------"
 pretty_print ""
-
 
 ##############################################################################
 # Dockerfile
@@ -178,7 +179,8 @@ RUN adduser --quiet --disabled-password \
     --gecos "Daniel Stonier" \${USER_NAME} \
     --uid \${USER_ID} && \
     apt-get update && \
-    apt-get -y install apt-utils sudo && \
+    export DEBIAN_FRONTEND=noninteractive && \
+    apt-get -y install ${SYSTEM_DEPS} && \
     echo "\${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
     usermod -a -G sudo \${USER_NAME} && \
     echo "I'm grooty, you should be too"
