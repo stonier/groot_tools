@@ -169,7 +169,7 @@ DOCKERFILE=${DOCKERFILE_DIR}/Dockerfile
 UBUNTU_IMAGE=nvidia/opengl:1.0-glvnd-runtime-ubuntu${RELEASE}
 DOCKER_IMAGE=groot:${DISTRO}
 USER_ID=$(id -u)
-SYSTEM_DEPS="bash-completion build-essential curl git locales lsb-release python3-dev sudo vim wget x11-apps"
+SYSTEM_DEPS="apt-utils bash-completion build-essential curl debian-keyring debian-archive-keyring git locales lsb-release openssh-server python3-dev software-properties-common sudo vim wget x11-apps"
 
 ##############################################################################
 # Debug
@@ -214,7 +214,8 @@ ARG WORKSPACE_DIR="/home/${USER}/workspace"
 
 # Install system packages
 RUN apt-get update
-RUN apt-get install -y apt-utils
+# Install this first - will result in only one spurious warning that apt-utils is not installed
+RUN apt-get install -y --no-install-recommends apt-utils
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y ${SYSTEM_DEPS}
 
 # System environment

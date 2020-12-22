@@ -108,6 +108,7 @@ CONTAINER_NAME="$(basename ${WORKSPACE})"
 TARGET_WORKSPACE=/home/${USER}/workspace
 MOUNT_OPTIONS="--mount src=${WORKSPACE},target=${TARGET_WORKSPACE},type=bind"
 GL_SERVER_OPTIONS="--env=DISPLAY --runtime=nvidia --volume /tmp/.X11-unix:/tmp/.X11-unix:ro"
+SSH_OPTIONS="--env=SSH_AUTH_SOCK --volume /home/${USER}/.ssh:/home/${USER}/.ssh --volume $(dirname $SSH_AUTH_SOCK):$(dirname $SSH_AUTH_SOCK)"
 EXITED_CONTAINER_ID=`docker ps -aq -f status=exited -f name=${CONTAINER_NAME}`
 RUNNING_CONTAINER_ID=`docker ps -aq -f status=running -f name=${CONTAINER_NAME}`
 
@@ -146,6 +147,6 @@ else
   #   -t  : attach a pseudo tty, needed for e.g. stdin/stdout, vim etc
   pretty_print "Create/Start container '${DOCKER_IMAGE}'->'${CONTAINER_NAME}'"
   echo "docker container run ${GL_SERVER_OPTIONS} ${MOUNT_OPTIONS} -i -t ${DOCKER_IMAGE}"
-  docker container run ${GL_SERVER_OPTIONS} ${MOUNT_OPTIONS} -i -t --name ${CONTAINER_NAME} ${DOCKER_IMAGE}
+  docker container run ${SSH_OPTIONS} ${GL_SERVER_OPTIONS} ${MOUNT_OPTIONS} -i -t --name ${CONTAINER_NAME} ${DOCKER_IMAGE}
 fi
 
