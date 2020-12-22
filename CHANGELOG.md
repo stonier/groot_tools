@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/).
 - ...
 
 ### Changed
+- gui and nvidia runtime docker support for groot-docker-*
 - groot-docker-build with fundamental system tools pre-installed (bash-completion build-essential curl lsb-release vim wget)
 
 ## [0.3.1] - 2020-12-15

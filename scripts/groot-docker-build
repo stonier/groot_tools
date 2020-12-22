@@ -1,5 +1,13 @@
 #!/bin/bash
 
+
+# Generates a Dockerfile for a development environment.
+#  - Maps this script's user to the docker image, with sudo priveleges
+#  - Installs a basic command line environment
+#  - Installs a gui environment for nvidia machines
+#
+# Warning: currently no checking if it is in fact an nvidia machine
+
 ##############################################################################
 # Colours
 ##############################################################################
@@ -58,6 +66,31 @@ install_package ()
     return 1
   fi
   pretty_warning "  $(padded_message ${PACKAGE_NAME} "installed")"
+  return 0
+}
+
+install_nvidia_docker2 ()
+{
+  PACKAGE_NAME=nvidia-docker2
+  dpkg -s ${PACKAGE_NAME} > /dev/null
+  if [ $? -ne 0 ]; then
+    HOST_DISTRIBUTION=$(. /etc/os-release; echo $ID$VERSION_ID)
+    curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+    curl -s -L https://nvidia.github.io/nvidia-docker/${HOST_DISTRIBUTION}/nvidia-docker.list | \
+                sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+    sudo apt-get update
+    sudo apt-get -q -y install ${PACKAGE_NAME} > /dev/null
+    if [ $? -ne 0 ]; then
+        pretty_error "  $(padded_message ${PACKAGE_NAME} "failed")"
+        return 1
+    fi
+    sudo pkill -SIGHUP dockerd
+    sudo service docker restart
+    pretty_warning "  $(padded_message ${PACKAGE_NAME} "installed")"
+  else
+    pretty_print "  $(padded_message ${PACKAGE_NAME} "found")"
+    return 0
+  fi
   return 0
 }
 
@@ -123,7 +156,8 @@ fi
 ##############################################################################
 
 pretty_header "System Dependencies"
-install_package docker.io || return
+install_package docker.io || exit 1
+install_nvidia_docker2 || exit 1
 
 ##############################################################################
 # Variables
@@ -131,10 +165,11 @@ install_package docker.io || return
 
 DOCKERFILE_DIR=`mktemp -d -p "/tmp"`
 DOCKERFILE=${DOCKERFILE_DIR}/Dockerfile
-UBUNTU_IMAGE=ubuntu:${RELEASE}
+# For vanilla ubuntu images, ubuntu:${RELEASE}
+UBUNTU_IMAGE=nvidia/opengl:1.0-glvnd-runtime-ubuntu${RELEASE}
 DOCKER_IMAGE=groot:${DISTRO}
-USER_ID=$(id -u ${USER})
-SYSTEM_DEPS="apt-utils bash-completion build-essential curl lsb-release sudo vim wget"
+USER_ID=$(id -u)
+SYSTEM_DEPS="bash-completion build-essential curl git locales lsb-release python3-dev sudo vim wget x11-apps"
 
 ##############################################################################
 # Debug
@@ -162,6 +197,11 @@ pretty_header "Dockerfile"
 # This is a quoted heredoc ('EOL') that will escape special characters so the
 # bash variables don't get substituted here.
 #  https://stackoverflow.com/questions/45047380/write-text-to-file-literally-including-special-characters
+#
+# - DEBIAN_FRONTEND chooses the method to configure debs when installing, prefer not to set it permanenently via ENV
+#
+# export DEBIAN_FRONTEND=noninteractive && \
+# ENV DEBIAN_FRONTEND noninteractive
 
 cat << EOL > ${DOCKERFILE}
 
@@ -170,22 +210,34 @@ FROM ${UBUNTU_IMAGE}
 LABEL maintainer="Daniel Stonier"
 
 # Build Arguments
-ARG USER_ID=1000
-ARG USER_NAME=bob
-ARG WORKSPACE_DIR="/home/\${USER_NAME}/workspace"
+ARG WORKSPACE_DIR="/home/${USER}/workspace"
 
+# Install system packages
+RUN apt-get update
+RUN apt-get install -y apt-utils
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y ${SYSTEM_DEPS}
+
+# System environment
+ENV TERM linux
+RUN locale-gen en_US.UTF-8
+ENV LANG en_US.UTF-8
+
+# NVIDIA runtime environment
+ENV NVIDIA_VISIBLE_DEVICES \\${NVIDIA_VISIBLE_DEVICES:-all}
+ENV NVIDIA_DRIVER_CAPABILITIES \\
+   \\${NVIDIA_DRIVER_CAPABILITIES:+\\$NVIDIA_DRIVER_CAPABILITIES,}graphics
+
+# Setup user
 RUN adduser --quiet --disabled-password \
-    --shell /bin/bash --home /home/\${USER_NAME}  \
-    --gecos "Daniel Stonier" \${USER_NAME} \
-    --uid \${USER_ID} && \
-    apt-get update && \
-    export DEBIAN_FRONTEND=noninteractive && \
-    apt-get -y install ${SYSTEM_DEPS} && \
-    echo "\${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
-    usermod -a -G sudo \${USER_NAME} && \
-    echo "I'm grooty, you should be too"
+    --shell /bin/bash --home /home/${USER}  \
+    --gecos "Daniel Stonier" ${USER} \
+    --uid ${USER_ID}
+RUN echo "${USER} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN usermod -a -G sudo ${USER}
 
-USER \${USER_NAME}
+RUN echo "I'm grooty, you should be too"
+
+USER ${USER}
 # USER root
 
 # Not sure if this is the best option, just what my non-docker user has, needed by some shell commands.
@@ -210,7 +262,5 @@ pretty_header "Docker Image"
 #   -t: a label for the image (name:tag)
 
 docker image build \
-    --build-arg USER_ID=${USER_ID} \
-    --build-arg USER_NAME=${USER} \
     --rm -t ${DOCKER_IMAGE} \
     ${DOCKERFILE_DIR}
