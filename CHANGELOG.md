@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/).
 - ...
 
 ### Changed
-- ...
+- [groot-docker-build] install networking tools in the image - iproute2 and net-tools
 
 ## [0.3.2] - 2020-12-30
 - [groot-docker-enter] pass in the user's ssh environment to the container
