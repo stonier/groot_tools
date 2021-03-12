@@ -169,7 +169,7 @@ DOCKERFILE=${DOCKERFILE_DIR}/Dockerfile
 UBUNTU_IMAGE=nvidia/opengl:1.0-glvnd-runtime-ubuntu${RELEASE}
 DOCKER_IMAGE=groot:${DISTRO}
 USER_ID=$(id -u)
-SYSTEM_DEPS="apt-utils bash-completion build-essential curl debian-keyring debian-archive-keyring git locales lsb-release openssh-server python3-dev software-properties-common sudo vim wget x11-apps"
+SYSTEM_DEPS="apt-utils bash-completion build-essential curl debian-keyring debian-archive-keyring git iproute2 locales lsb-release net-tools openssh-server python3-dev software-properties-common sudo vim wget x11-apps"
 
 ##############################################################################
 # Debug
