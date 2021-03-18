@@ -231,12 +231,12 @@ ENV NVIDIA_DRIVER_CAPABILITIES \\
 # Setup user
 RUN adduser --quiet --disabled-password \
     --shell /bin/bash --home /home/${USER}  \
-    --gecos "Daniel Stonier" ${USER} \
+    --gecos "Slartibartfast" ${USER} \
     --uid ${USER_ID}
 RUN echo "${USER} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN usermod -a -G sudo ${USER}
 
-RUN echo "I'm grooty, you should be too"
+RUN echo "I'm froody, you should be too"
 
 USER ${USER}
 # USER root
