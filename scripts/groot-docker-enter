@@ -51,6 +51,7 @@ show_help ()
   pretty_print "    Required Options:"
   pretty_print "        --distro=<distro>       : image name (e.g. 'bionic')"
   pretty_print "        --workspace=<workspace> : worskpace dir (e.g. /mnt/workspaces/foo)"
+  pretty_print "        --name=<name>           : container name (default, uses trailing workspace dir)"
   pretty_print ""
   pretty_print "    Options:"
   pretty_print "        --help : show this help message"
@@ -76,6 +77,10 @@ case $i in
     WORKSPACE="${i#*=}"
     shift
     ;;
+    -n=*|--name=*)
+    CONTAINER_NAME="${i#*=}"
+    shift
+    ;;
     *)
        # unknown option
     ;;
@@ -99,12 +104,15 @@ if [ -z "${WORKSPACE}" ]; then
   exit 1
 fi
 
+if [ -z "${CONTAINER_NAME}" ]; then
+  CONTAINER_NAME="$(basename ${WORKSPACE})"
+fi
+
 ##############################################################################
 # Variables
 ##############################################################################
 
 DOCKER_IMAGE=groot:${DISTRO}
-CONTAINER_NAME="$(basename ${WORKSPACE})"
 TARGET_WORKSPACE=/home/${USER}/workspace
 MOUNT_OPTIONS="--mount src=${WORKSPACE},target=${TARGET_WORKSPACE},type=bind"
 GL_SERVER_OPTIONS="--env=DISPLAY --runtime=nvidia --volume /tmp/.X11-unix:/tmp/.X11-unix:ro"
@@ -133,7 +141,8 @@ pretty_print ""
 ##############################################################################
 
 if [ ! -z "${EXITED_CONTAINER_ID}" ]; then
-  pretty_print "Start session with container '${CONTAINER_NAME}'"
+  pretty_print "Start an interactive session with existing container '${CONTAINER_NAME}'"
+  echo "  docker container start -i ${EXITED_CONTAINER_ID}"
   docker container start -i ${EXITED_CONTAINER_ID}
 elif [ ! -z "${RUNNING_CONTAINER_ID}" ]; then
   pretty_print "Attach to running session with container '${CONTAINER_NAME}'"
@@ -145,8 +154,19 @@ else
   #   -i  : interactively run the image in a container 
   #   -rm : remove the container on exit, this loses changes!
   #   -t  : attach a pseudo tty, needed for e.g. stdin/stdout, vim etc
-  pretty_print "Create/Start container '${DOCKER_IMAGE}'->'${CONTAINER_NAME}'"
-  echo "docker container run ${GL_SERVER_OPTIONS} ${MOUNT_OPTIONS} -i -t ${DOCKER_IMAGE}"
-  docker container run ${SSH_OPTIONS} ${GL_SERVER_OPTIONS} ${MOUNT_OPTIONS} -i -t --name ${CONTAINER_NAME} ${DOCKER_IMAGE}
+  pretty_print "Create a shiny new container: 'image:${DOCKER_IMAGE}'->'container:${CONTAINER_NAME}'"
+  echo "  docker container create ${SSH_OPTIONS} ${GL_SERVER_OPTIONS} ${MOUNT_OPTIONS} -i -t --name ${CONTAINER_NAME} ${DOCKER_IMAGE}"
+  docker container create ${SSH_OPTIONS} ${GL_SERVER_OPTIONS} ${MOUNT_OPTIONS} -i -t --name ${CONTAINER_NAME} ${DOCKER_IMAGE} > /dev/null
+  CONTAINER_ID=`docker ps -aqf name=${CONTAINER_NAME}`
+  pretty_print "Add a custom prompt (user@${CONTAINER_NAME} -> ~/.bash_profile)"
+  echo "  docker container start ${CONTAINER_ID}"
+  docker container start ${CONTAINER_ID} > /dev/null
+  echo "  docker container exec ${CONTAINER_ID} bash -c \"echo \"export PS1='\[\033[01;32m\]\u@${CONTAINER_NAME}\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '\" >> /home/${USER}/.bash_profile\""
+  docker container exec ${CONTAINER_ID} bash -c "echo \"export PS1='\[\033[01;32m\]\u@${CONTAINER_NAME}\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '\" >> /home/${USER}/.bash_profile"
+  # Need to stop so the interactive session runs all the login scripts (incl. this .bash_profile)
+  echo "  docker container stop ${CONTAINER_ID}"
+  docker container stop ${CONTAINER_ID} > /dev/null
+  pretty_print "Start an interactive session"
+  echo "  docker container start -i ${CONTAINER_ID}"
+  docker container start -i ${CONTAINER_ID}
 fi
-
